@@ -18,68 +18,63 @@ app.innerHTML = `
     </header>
 
     <div class="monitor" aria-label="Retro desktop monitor">
-      <div class="monitor-bezel">
-        <div class="monitor-inner">
-          <div class="crt-glass">
-            <section class="console" aria-label="Vanity generator console">
-              <div class="console-body">
-                <div class="row">
-                  <span class="prompt" id="pattern-label">&gt; pattern</span>
-                  <div class="menu" id="pattern-menu">
-                    <button
-                      id="pattern-trigger"
-                      class="menu-trigger"
-                      type="button"
-                      aria-haspopup="listbox"
-                      aria-expanded="false"
-                      aria-labelledby="pattern-label pattern-trigger"
-                    >
-                      <span id="pattern-value">${PRESETS[0].label}</span>
-                      <span class="menu-caret" aria-hidden="true">▼</span>
-                    </button>
-                    <ul
-                      id="pattern-list"
-                      class="menu-list"
-                      role="listbox"
-                      aria-labelledby="pattern-label"
-                      hidden
-                    >
-                      ${PRESETS.map(
-                        (p, i) =>
-                          `<li role="option" class="menu-option${i === 0 ? ' selected' : ''}" data-prefix="${p.prefix}" data-label="${p.label}" aria-selected="${i === 0 ? 'true' : 'false'}">${p.label}</li>`,
-                      ).join('')}
-                    </ul>
-                    <input type="hidden" id="pattern" value="${PRESETS[0].prefix}" />
-                  </div>
-                </div>
+      <img class="monitor-art" src="/monitor.png" alt="" draggable="false" />
+      <div class="monitor-screen">
+        <div class="crt-glass" aria-hidden="true"></div>
+        <section class="console" aria-label="Vanity generator console">
+          <div class="console-body">
+            <div class="row">
+              <span class="prompt" id="pattern-label">&gt; pattern</span>
+              <div class="menu" id="pattern-menu">
+                <button
+                  id="pattern-trigger"
+                  class="menu-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-labelledby="pattern-label pattern-trigger"
+                >
+                  <span id="pattern-value">${PRESETS[0].label}</span>
+                  <span class="menu-caret" aria-hidden="true">▼</span>
+                </button>
+                <ul
+                  id="pattern-list"
+                  class="menu-list"
+                  role="listbox"
+                  aria-labelledby="pattern-label"
+                  hidden
+                >
+                  ${PRESETS.map(
+                    (p, i) =>
+                      `<li role="option" class="menu-option${i === 0 ? ' selected' : ''}" data-prefix="${p.prefix}" data-label="${p.label}" aria-selected="${i === 0 ? 'true' : 'false'}">${p.label}</li>`,
+                  ).join('')}
+                </ul>
+                <input type="hidden" id="pattern" value="${PRESETS[0].prefix}" />
+              </div>
+            </div>
 
-                <div class="row actions">
-                  <button id="generate" class="btn primary" type="button">Generate</button>
-                  <button id="stop" class="btn ghost" type="button" disabled>Stop</button>
-                </div>
+            <div class="row actions">
+              <button id="generate" class="btn primary" type="button">Generate</button>
+              <button id="stop" class="btn ghost" type="button" disabled>Stop</button>
+            </div>
 
-                <pre id="log" class="log" aria-live="polite">&gt; Ready. Select a pattern and press Generate.
+            <pre id="log" class="log" aria-live="polite">&gt; Ready. Select a pattern and press Generate.
 &gt; Generation runs entirely on this device.</pre>
 
-                <div id="result" class="result hidden">
-                  <div class="field">
-                    <span class="label">Address</span>
-                    <button id="address" class="value copyable" type="button" title="Click to copy"></button>
-                  </div>
-                  <div class="field">
-                    <span class="label">Private key (WIF)</span>
-                    <button id="wif" class="value copyable masked" type="button" title="Click to reveal"></button>
-                  </div>
-                  <p class="warn">Never share your private key. Anyone with it can spend your bitcoin.</p>
-                </div>
+            <div id="result" class="result hidden">
+              <div class="field">
+                <span class="label">Address</span>
+                <button id="address" class="value copyable" type="button" title="Click to copy"></button>
               </div>
-            </section>
+              <div class="field">
+                <span class="label">Private key (WIF)</span>
+                <button id="wif" class="value copyable masked" type="button" title="Click to reveal"></button>
+              </div>
+              <p class="warn">Never share your private key. Anyone with it can spend your bitcoin.</p>
+            </div>
           </div>
-          <div class="monitor-led" aria-hidden="true"></div>
-        </div>
+        </section>
       </div>
-      <div class="monitor-neck" aria-hidden="true"></div>
-      <div class="monitor-base" aria-hidden="true"></div>
     </div>
 
     <footer class="foot">
@@ -186,6 +181,12 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && menuOpen) setMenuOpen(false)
 })
 
+function killWorker() {
+  if (!worker) return
+  worker.terminate()
+  worker = null
+}
+
 function ensureWorker(): Worker {
   if (worker) return worker
   worker = new Worker(new URL('./vanityWorker.ts', import.meta.url), {
@@ -270,7 +271,10 @@ generateBtn.addEventListener('click', () => {
 })
 
 stopBtn.addEventListener('click', () => {
-  post({ type: 'stop' })
+  // Hard-stop immediately — don't wait for the current crypto batch.
+  killWorker()
+  setBusy(false)
+  setLog('> Stopped.')
 })
 
 addressBtn.addEventListener('click', async () => {

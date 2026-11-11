@@ -58,11 +58,12 @@ async function startSearch(prefix: string, currentId: number): Promise<void> {
   let lastReport = started
   let attemptsAtReport = 0
 
-  // Yield to the event loop so stop messages can land.
-  const BATCH = 250
+  // Small batches + real event-loop yield so STOP can land quickly.
+  const BATCH = 32
 
   while (running && currentId === runId) {
     for (let i = 0; i < BATCH; i++) {
+      if (!running || currentId !== runId) break
       attempts++
       const priv = randomPrivateKey()
       const address = privateKeyToAddress(priv)
@@ -80,15 +81,18 @@ async function startSearch(prefix: string, currentId: number): Promise<void> {
       }
     }
 
+    if (!running || currentId !== runId) break
+
     const now = performance.now()
-    if (now - lastReport >= 200) {
+    if (now - lastReport >= 120) {
       const dt = (now - lastReport) / 1000
       const rate = dt > 0 ? (attempts - attemptsAtReport) / dt : 0
       const out: WorkerOutMessage = { type: 'progress', attempts, rate }
       self.postMessage(out)
       lastReport = now
       attemptsAtReport = attempts
-      await Promise.resolve()
     }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
   }
 }
